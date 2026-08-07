@@ -1,0 +1,28 @@
+[project]
+name = "neurocursor"
+version = "2.0.0"
+description = "AI-powered gesture control desktop app"
+requires-python = ">=3.11,<3.14"
+authors = [{ name = "Ansh Sharma" }]
+dependencies = []
+
+[project.optional-dependencies]
+desktop = [
+    "opencv-python>=4.9",
+    "mediapipe>=0.10",
+    "numpy",
+    "pyautogui",
+]
+dev = [
+    "pytest",
+]
+
+[project.scripts]
+neurocursor = "neurocursor.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
