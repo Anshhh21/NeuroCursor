@@ -8,7 +8,7 @@ import os
 import math
 from neurocursor import __version__
 
-# Helper to calculate distance for pinch detection
+# for pinch detection, we need to calculate the distance between the index finger tip and thumb tip
 def get_distance(p1, p2):
     return math.hypot(p1.x - p2.x, p1.y - p2.y)
 
@@ -21,7 +21,7 @@ def run() -> int:
     print(json.dumps(status))
     sys.stdout.flush()
 
-    # --- PyInstaller File Path Magic ---
+    # pytinstaller files does what THIS
     if getattr(sys, 'frozen', False):
         model_path = os.path.join(sys._MEIPASS, 'neurocursor', 'hand_landmarker.task')
     else:
@@ -36,12 +36,11 @@ def run() -> int:
         if result.hand_landmarks:
             for hand_landmarks, handedness in zip(result.hand_landmarks, result.handedness):
                 
-                # --- BUG FIX: MediaPipe Version Data Extraction ---
-                # Safely extracts data whether pip gave you a Protobuf OR a Python list!
+                # whether pip gave you a Protobuf OR a Py list this made me cry 
                 lm = hand_landmarks.landmark if hasattr(hand_landmarks, 'landmark') else hand_landmarks
                 hd = handedness.classification if hasattr(handedness, 'classification') else handedness
                 hand_name = getattr(hd[0], 'category_name', getattr(hd[0], 'label', "Unknown"))
-                # --------------------------------------------------
+                
                 
                 thumb_tip = lm[4]
                 index_tip = lm[8]
@@ -49,7 +48,7 @@ def run() -> int:
                 ring_tip = lm[16]
                 pinky_tip = lm[20]
 
-                # Finger up detection logic
+                # finger up detection
                 index_up = index_tip.y < lm[6].y
                 middle_up = middle_tip.y < lm[10].y
                 ring_up = ring_tip.y < lm[14].y
