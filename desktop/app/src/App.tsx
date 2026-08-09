@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
+
 
 interface EngineMessage {
   engineStatus?: string;
@@ -28,6 +30,9 @@ function App() {
   const canvasRef      = useRef<HTMLCanvasElement>(null);
   // Ref keeps the canvas draw-loop up to date without re-subscribing
   const engineDataRef  = useRef<EngineMessage | null>(null);
+  const smoothXRef = useRef(0.5);  // Smoothed X position (0-1 range)
+  const smoothYRef = useRef(0.5);  // Smoothed Y position (0-1 range)
+
 
   // Sync ref with state so the RAF loop always reads fresh data 
   useEffect(() => {
@@ -45,15 +50,34 @@ function App() {
       .catch((err) => console.error("Webcam error:", err));
 
     // Engine events
-    const unlisten = listen<string>("engine-event", (event) => {
+    const unlisten = listen<string>("engine-event", async (event) => {
       try {
         const parsed: EngineMessage = JSON.parse(event.payload);
         setEngineData(parsed);
         setIsConnected(true);
+    
+        // ── OS Mouse Control ─────────────────────────────────────
+        if (parsed.x !== undefined && parsed.y !== undefined && parsed.event !== "pause") {
+          const ALPHA = 0.25; // Smoothing: lower = smoother but laggy, higher = snappier but jittery
+    
+          // Exponential moving average — blends current position toward new position
+          smoothXRef.current = smoothXRef.current * (1 - ALPHA) + (1 - parsed.x) * ALPHA;
+          smoothYRef.current = smoothYRef.current * (1 - ALPHA) + parsed.y * ALPHA;
+    
+          // Convert 0-1 range to actual screen pixel coordinates
+          const screenX = Math.round(smoothXRef.current * window.screen.width);
+          const screenY = Math.round(smoothYRef.current * window.screen.height);
+    
+          // Call the Rust command — moves the real OS cursor
+          await invoke("move_mouse", { x: screenX, y: screenY });
+        }
+        // ─────────────────────────────────────────────────────────
+    
       } catch (err) {
         console.error("Failed to parse engine JSON:", err);
       }
     });
+    
 
     return () => { unlisten.then((fn) => fn()); };
   }, []);

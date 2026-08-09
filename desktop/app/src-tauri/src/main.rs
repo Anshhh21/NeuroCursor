@@ -1,9 +1,16 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#[tauri::command]
+fn move_mouse(x: f64, y: f64) {
+    use enigo::{Enigo, Mouse, Settings, Coordinate};
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
+    let _ = enigo.move_mouse(x as i32, y as i32, Coordinate::Abs);
+}
 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .invoke_handler(tauri::generate_handler![move_mouse]) 
         .setup(|app| {
             let handle = app.handle().clone();
 
