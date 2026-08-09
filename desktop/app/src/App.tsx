@@ -92,17 +92,17 @@ function App() {
         const [r, g, b] = GESTURE_COLOR[data.event ?? ""] ?? DEFAULT_COLOR;
 
         // Outer glow
-        const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 36);
+        const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 20);
         glow.addColorStop(0, `rgba(${r},${g},${b},0.55)`);
         glow.addColorStop(1, `rgba(${r},${g},${b},0)`);
         ctx.beginPath();
-        ctx.arc(cx, cy, 36, 0, Math.PI * 2);
+        ctx.arc(cx, cy, 20, 0, Math.PI * 2);
         ctx.fillStyle = glow;
         ctx.fill();
 
         // Solid dot core
         ctx.beginPath();
-        ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+        ctx.arc(cx, cy, 3, 0, Math.PI * 2);
         ctx.fillStyle = `rgb(${r},${g},${b})`;
         ctx.shadowColor = `rgba(${r},${g},${b},0.9)`;
         ctx.shadowBlur  = 16;
