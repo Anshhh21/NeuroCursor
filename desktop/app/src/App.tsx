@@ -29,12 +29,12 @@ function App() {
   // Ref keeps the canvas draw-loop up to date without re-subscribing
   const engineDataRef  = useRef<EngineMessage | null>(null);
 
-  // ── Sync ref with state so the RAF loop always reads fresh data ──────────
+  // Sync ref with state so the RAF loop always reads fresh data 
   useEffect(() => {
     engineDataRef.current = engineData;
   }, [engineData]);
 
-  // ── Webcam + Tauri IPC listener ──────────────────────────────────────────
+  //Webcam + Tauri IPC listener 
   useEffect(() => {
     // Webcam
     navigator.mediaDevices
@@ -58,7 +58,7 @@ function App() {
     return () => { unlisten.then((fn) => fn()); };
   }, []);
 
-  // ── Canvas overlay: laser-dot draw loop ─────────────────────────────────
+  //Canvas overlay: laser-dot draw loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
