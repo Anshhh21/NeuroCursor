@@ -29,11 +29,14 @@ function App() {
   // Settings state (drives the slider UI)
 const [alpha, setAlpha]           = useState(0.25);   // cursor smoothing
 const [debounceMs, setDebounceMs] = useState(800);    // gesture click delay
+const [scrollSpeed, setScrollSpeed] = useState(300);  // scroll sensitivity multiplier
 
 // Refs so the event-listener closure always reads fresh values
 // (useState inside a useEffect with [] would be stale)
-const alphaRef      = useRef(0.25);
-const debounceMsRef = useRef(800);
+const alphaRef       = useRef(0.25);
+const debounceMsRef  = useRef(800);
+const scrollSpeedRef = useRef(300);
+const lastScrollYRef = useRef<number | null>(null);  // tracks finger Y during scroll gesture
 
 
   const videoRef       = useRef<HTMLVideoElement>(null);
@@ -51,8 +54,9 @@ const debounceMsRef = useRef(800);
   }, [engineData]);
   // Detects total virtual desktop size across all monitors
   const screenBoundsRef = useRef({ width: window.screen.width, height: window.screen.height, offsetX: 0, offsetY: 0 });
-  useEffect(() => { alphaRef.current = alpha; },      [alpha]);
-  useEffect(() => { debounceMsRef.current = debounceMs; }, [debounceMs]);
+  useEffect(() => { alphaRef.current = alpha; },            [alpha]);
+  useEffect(() => { debounceMsRef.current = debounceMs; },  [debounceMs]);
+  useEffect(() => { scrollSpeedRef.current = scrollSpeed; }, [scrollSpeed]);
   
 // monitor detection and logging
 useEffect(() => {
@@ -147,16 +151,25 @@ useEffect(() => {
           await invoke("mouse_click", { button: "left" });
         }
       } else if (parsed.event === "scroll") {
-        // Scroll: continuous while gesture held — fires every 100ms
-        if (parsed.event !== last.event || now - last.time > 100) {
-          lastGestureRef.current = { event: parsed.event, time: now };
-          await invoke("mouse_scroll", { length: 3 }); // positive = scroll down on macOS
+        // Velocity-based scroll: delta of finger Y drives direction + speed
+        // Finger moves UP   (deltaY < 0) → page scrolls DOWN (positive length)
+        // Finger moves DOWN (deltaY > 0) → page scrolls UP   (negative length)
+        const currentY = parsed.y!;
+        if (lastScrollYRef.current !== null) {
+          const deltaY = currentY - lastScrollYRef.current;
+          const scrollAmount = Math.round(-deltaY * scrollSpeedRef.current);
+          if (Math.abs(scrollAmount) >= 1) {
+            await invoke("mouse_scroll", { length: scrollAmount });
+          }
         }
+        lastScrollYRef.current = currentY;
+        lastGestureRef.current = { event: parsed.event, time: now };
       } else {
-        // Neutral gesture — reset debounce so next action fires immediately
+        // Neutral gesture — reset both debounce and scroll tracking
         if (parsed.event !== last.event) {
           lastGestureRef.current = { event: parsed.event ?? "", time: 0 };
         }
+        lastScrollYRef.current = null; // reset so next scroll starts fresh
       }
       // ─────────────────────────────────────────────────────────────────
 
@@ -347,6 +360,26 @@ useEffect(() => {
             <div className="flex justify-between text-[10px] text-zinc-600 mt-0.5">
               <span>Quick (200ms)</span>
               <span>Slow (1500ms)</span>
+            </div>
+          </div>
+
+          {/* Scroll Speed Slider */}
+          <div>
+            <div className="flex justify-between text-xs text-zinc-400 mb-1">
+              <span>Scroll Speed</span>
+              <span className="text-emerald-400 font-mono">{scrollSpeed}x</span>
+            </div>
+            <input
+              id="slider-scroll-speed"
+              type="range"
+              min={50} max={800} step={25}
+              value={scrollSpeed}
+              onChange={(e) => setScrollSpeed(parseInt(e.target.value))}
+              className="w-full accent-emerald-500"
+            />
+            <div className="flex justify-between text-[10px] text-zinc-600 mt-0.5">
+              <span>Slow</span>
+              <span>Fast</span>
             </div>
           </div>
 
