@@ -26,16 +26,15 @@ const DEFAULT_COLOR: [number, number, number] = [239, 68, 68];
 function App() {
   const [engineData, setEngineData] = useState<EngineMessage | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  // Settings state (drives the slider UI)
-const [alpha, setAlpha]           = useState(0.25);   // cursor smoothing
-const [debounceMs, setDebounceMs] = useState(800);    // gesture click delay
-const [scrollSpeed, setScrollSpeed] = useState(300);  // scroll sensitivity multiplier
+  // Settings state — loaded from localStorage so they survive app restarts
+const [alpha, setAlpha]           = useState(() => parseFloat(localStorage.getItem('nc_alpha')       ?? '0.25'));
+const [debounceMs, setDebounceMs] = useState(() => parseInt(localStorage.getItem('nc_debounceMs')   ?? '800'));
+const [scrollSpeed, setScrollSpeed] = useState(() => parseInt(localStorage.getItem('nc_scrollSpeed') ?? '50'));
 
 // Refs so the event-listener closure always reads fresh values
-// (useState inside a useEffect with [] would be stale)
-const alphaRef       = useRef(0.25);
-const debounceMsRef  = useRef(800);
-const scrollSpeedRef = useRef(300);
+const alphaRef       = useRef(parseFloat(localStorage.getItem('nc_alpha')       ?? '0.25'));
+const debounceMsRef  = useRef(parseInt(localStorage.getItem('nc_debounceMs')   ?? '800'));
+const scrollSpeedRef = useRef(parseInt(localStorage.getItem('nc_scrollSpeed') ?? '50'));
 const lastScrollYRef = useRef<number | null>(null);  // tracks finger Y during scroll gesture
 
 
@@ -54,9 +53,10 @@ const lastScrollYRef = useRef<number | null>(null);  // tracks finger Y during s
   }, [engineData]);
   // Detects total virtual desktop size across all monitors
   const screenBoundsRef = useRef({ width: window.screen.width, height: window.screen.height, offsetX: 0, offsetY: 0 });
-  useEffect(() => { alphaRef.current = alpha; },            [alpha]);
-  useEffect(() => { debounceMsRef.current = debounceMs; },  [debounceMs]);
-  useEffect(() => { scrollSpeedRef.current = scrollSpeed; }, [scrollSpeed]);
+  // Sync state → ref AND persist to localStorage on every change
+  useEffect(() => { alphaRef.current = alpha;             localStorage.setItem('nc_alpha',       alpha.toString()); },       [alpha]);
+  useEffect(() => { debounceMsRef.current = debounceMs;   localStorage.setItem('nc_debounceMs',  debounceMs.toString()); },  [debounceMs]);
+  useEffect(() => { scrollSpeedRef.current = scrollSpeed; localStorage.setItem('nc_scrollSpeed', scrollSpeed.toString()); }, [scrollSpeed]);
   
 // monitor detection and logging
 useEffect(() => {
@@ -372,7 +372,7 @@ useEffect(() => {
             <input
               id="slider-scroll-speed"
               type="range"
-              min={50} max={800} step={25}
+              min={20} max={100} step={5}
               value={scrollSpeed}
               onChange={(e) => setScrollSpeed(parseInt(e.target.value))}
               className="w-full accent-emerald-500"
