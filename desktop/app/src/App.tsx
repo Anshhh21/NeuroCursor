@@ -26,6 +26,15 @@ const DEFAULT_COLOR: [number, number, number] = [239, 68, 68];
 function App() {
   const [engineData, setEngineData] = useState<EngineMessage | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  // Settings state (drives the slider UI)
+const [alpha, setAlpha]           = useState(0.25);   // cursor smoothing
+const [debounceMs, setDebounceMs] = useState(800);    // gesture click delay
+
+// Refs so the event-listener closure always reads fresh values
+// (useState inside a useEffect with [] would be stale)
+const alphaRef      = useRef(0.25);
+const debounceMsRef = useRef(800);
+
 
   const videoRef       = useRef<HTMLVideoElement>(null);
   const canvasRef      = useRef<HTMLCanvasElement>(null);
@@ -42,7 +51,9 @@ function App() {
   }, [engineData]);
   // Detects total virtual desktop size across all monitors
   const screenBoundsRef = useRef({ width: window.screen.width, height: window.screen.height, offsetX: 0, offsetY: 0 });
-
+  useEffect(() => { alphaRef.current = alpha; },      [alpha]);
+  useEffect(() => { debounceMsRef.current = debounceMs; }, [debounceMs]);
+  
 // monitor detection and logging
 useEffect(() => {
   availableMonitors().then((monitors) => {
@@ -97,7 +108,8 @@ useEffect(() => {
     
        // OS Mouse Control 
       if (parsed.x !== undefined && parsed.y !== undefined && parsed.event !== "pause") {
-        const ALPHA = 0.25;
+        const ALPHA = alphaRef.current;
+
 
         // Dead-zone remap: MediaPipe's practical range → full 0-1
         // Tune these constants if cursor still can't reach edges
@@ -123,28 +135,30 @@ useEffect(() => {
         await invoke("move_mouse", { x: screenX, y: screenY });
       }
 
-      //Gesture Actions 
-      const DEBOUNCE_MS = 800; // min ms between the same gesture firing again
-      const now = Date.now();
+      // ── Gesture Actions ───────────────────────────────────────────────
+      const DEBOUNCE_MS = debounceMsRef.current;
+      const now  = Date.now();
       const last = lastGestureRef.current;
 
-      if (parsed.event === "left-click" || parsed.event === "scroll") {
-        // Fire only if gesture just changed, OR enough time has passed
+      if (parsed.event === "left-click") {
+        // Click: heavy debounce — one pinch = one click
         if (parsed.event !== last.event || now - last.time > DEBOUNCE_MS) {
           lastGestureRef.current = { event: parsed.event, time: now };
-
-          if (parsed.event === "left-click") {
-            await invoke("mouse_click", { button: "left" });
-          } else if (parsed.event === "scroll") {
-            await invoke("mouse_scroll", { length: -3 }); // negative = scroll up
-          }
+          await invoke("mouse_click", { button: "left" });
+        }
+      } else if (parsed.event === "scroll") {
+        // Scroll: continuous while gesture held — fires every 100ms
+        if (parsed.event !== last.event || now - last.time > 100) {
+          lastGestureRef.current = { event: parsed.event, time: now };
+          await invoke("mouse_scroll", { length: 3 }); // positive = scroll down on macOS
         }
       } else {
-        // Gesture changed to something neutral — reset so next gesture fires cleanly
+        // Neutral gesture — reset debounce so next action fires immediately
         if (parsed.event !== last.event) {
           lastGestureRef.current = { event: parsed.event ?? "", time: 0 };
         }
       }
+      // ─────────────────────────────────────────────────────────────────
 
     
       } catch (err) {
@@ -290,6 +304,55 @@ useEffect(() => {
           <div>Dot: <span className={isHandVisible ? "text-emerald-400" : "text-red-400"}>{isHandVisible ? "YES ✓" : "NO ✗"}</span></div>
         </div>
       </div>
+            {/* Settings Panel */}
+            <div className="w-full max-w-3xl mt-4 bg-zinc-900 rounded-2xl border border-zinc-800 p-5 shadow-xl">
+        <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-widest mb-4">Settings</h2>
+
+        <div className="space-y-5">
+
+          {/* Smoothing Slider */}
+          <div>
+            <div className="flex justify-between text-xs text-zinc-400 mb-1">
+              <span>Cursor Smoothing</span>
+              <span className="text-emerald-400 font-mono">{alpha.toFixed(2)}</span>
+            </div>
+            <input
+              id="slider-smoothing"
+              type="range"
+              min={0.05} max={0.5} step={0.01}
+              value={alpha}
+              onChange={(e) => setAlpha(parseFloat(e.target.value))}
+              className="w-full accent-emerald-500"
+            />
+            <div className="flex justify-between text-[10px] text-zinc-600 mt-0.5">
+              <span>Very Smooth (slower)</span>
+              <span>Raw (faster)</span>
+            </div>
+          </div>
+
+          {/* Debounce Slider */}
+          <div>
+            <div className="flex justify-between text-xs text-zinc-400 mb-1">
+              <span>Click Delay</span>
+              <span className="text-emerald-400 font-mono">{debounceMs}ms</span>
+            </div>
+            <input
+              id="slider-debounce"
+              type="range"
+              min={200} max={1500} step={50}
+              value={debounceMs}
+              onChange={(e) => setDebounceMs(parseInt(e.target.value))}
+              className="w-full accent-emerald-500"
+            />
+            <div className="flex justify-between text-[10px] text-zinc-600 mt-0.5">
+              <span>Quick (200ms)</span>
+              <span>Slow (1500ms)</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
     </div>
   );
 }
