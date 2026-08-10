@@ -6,15 +6,32 @@ fn move_mouse(x: f64, y: f64) {
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
     let _ = enigo.move_mouse(x as i32, y as i32, Coordinate::Abs);
 }
+#[tauri::command]
+fn mouse_click(button: String) {
+    use enigo::{Enigo, Mouse, Settings, Button, Direction};
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
+    let btn = match button.as_str() {
+        "right" => Button::Right,
+        _ => Button::Left,
+    };
+    let _ = enigo.button(btn, Direction::Click);
+}
+
+#[tauri::command]
+fn mouse_scroll(length: i32) {
+    use enigo::{Enigo, Mouse, Settings, Axis};
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
+    let _ = enigo.scroll(length, Axis::Vertical);
+}
 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![move_mouse]) 
+        .invoke_handler(tauri::generate_handler![move_mouse, mouse_click, mouse_scroll]) 
         .setup(|app| {
             let handle = app.handle().clone();
 
-            // ──────────────────────────────────────────────────────────────────
+            
             // DEV MODE: Run Python directly from the .venv.
             //
             // Why: The PyInstaller one-file binary extracts 114MB to /tmp on

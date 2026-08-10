@@ -32,7 +32,13 @@ def run() -> int:
     HandLandmarkerOptions = mp.tasks.vision.HandLandmarkerOptions
     VisionRunningMode = mp.tasks.vision.RunningMode
 
+    # ── Pause/Resume toggle state ─────────────────────────────────────────
+    # Open palm once = pause.  Open palm again = resume.  No fist needed.
+    cursor_paused = False  # Is the cursor currently frozen?
+    prev_palm     = False  # Was the last frame an open palm? (rising-edge guard)
+
     def print_result(result, output_image, timestamp_ms: int):
+        nonlocal cursor_paused, prev_palm
         if result.hand_landmarks:
             for hand_landmarks, handedness in zip(result.hand_landmarks, result.handedness):
                 
@@ -59,16 +65,23 @@ def run() -> int:
                 is_pinching = pinch_dist < 0.05 
 
                 # Set default event
-                current_event = "tracking" 
+                current_event = "tracking"
 
-                if is_pinching:
-                    current_event = "right-click"
-                elif fingers_up_count == 4:
-                    current_event = "pause"      
-                elif fingers_up_count == 0:
-                    current_event = "resume"     
+                is_palm = (fingers_up_count == 4)
+
+                # Rising-edge toggle: only fires the moment the palm first appears
+                # (prevents a 1-second palm from toggling 30 times)
+                if is_palm and not prev_palm:
+                    cursor_paused = not cursor_paused
+                prev_palm = is_palm
+
+                if cursor_paused:
+                    current_event = "pause"
+                elif is_pinching:
+                    current_event = "left-click"
                 elif index_up and middle_up and not ring_up and not pinky_up:
-                    current_event = "scroll"     
+                    current_event = "scroll"
+                # else: stays "tracking"
                 
                 # Send the final package to React
                 telemetry = {
@@ -79,8 +92,14 @@ def run() -> int:
                     "timestamp": timestamp_ms
                 }
                 
-                print(json.dumps(telemetry))
-                sys.stdout.flush()
+                try:
+                    print(json.dumps(telemetry))
+                    sys.stdout.flush()
+                except (BrokenPipeError, IOError):
+                    os._exit(0)  # Parent process closed stdout — exit Python immediately to release webcam
+        else:
+            # No hand visible — reset so next palm correctly triggers the toggle
+            prev_palm = False
 
     options = HandLandmarkerOptions(
         base_options=BaseOptions(model_asset_path=model_path),
@@ -93,6 +112,7 @@ def run() -> int:
     
     try:
         with HandLandmarker.create_from_options(options) as landmarker:
+            last_ts_ms = -1  # Tracks last timestamp — MediaPipe requires strictly increasing values
             while cap.isOpened():
                 success, frame = cap.read()
                 if not success:
@@ -101,7 +121,11 @@ def run() -> int:
                 rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
                 
-                landmarker.detect_async(mp_image, int(time.time() * 1000))
+                ts_ms = int(time.time() * 1000)
+                if ts_ms <= last_ts_ms:       # M2 loop can outrun 1ms resolution
+                    ts_ms = last_ts_ms + 1
+                last_ts_ms = ts_ms
+                landmarker.detect_async(mp_image, ts_ms)
                 
     except Exception as e:
         print(json.dumps({"engineStatus": "error", "message": str(e)}))

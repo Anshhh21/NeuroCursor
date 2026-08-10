@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
+import { availableMonitors } from "@tauri-apps/api/window";
 
 
 interface EngineMessage {
@@ -16,9 +17,9 @@ interface EngineMessage {
 
 // Gesture → colour mapping
 const GESTURE_COLOR: Record<string, [number, number, number]> = {
-  "pause":       [234, 179,   8],
-  "right-click": [ 59, 130, 246],
-  "scroll":      [168,  85, 247],
+  "pause":       [239,  68,  68],  // red    — cursor frozen (open palm toggle)
+  "left-click":  [ 59, 130, 246],  // blue   — pinch
+  "scroll":      [168,  85, 247],  // purple — two fingers
 };
 const DEFAULT_COLOR: [number, number, number] = [239, 68, 68];
 
@@ -32,19 +33,57 @@ function App() {
   const engineDataRef  = useRef<EngineMessage | null>(null);
   const smoothXRef = useRef(0.5);  // Smoothed X position (0-1 range)
   const smoothYRef = useRef(0.5);  // Smoothed Y position (0-1 range)
+  const lastGestureRef = useRef<{ event: string; time: number }>({ event: "", time: 0 });
 
 
   // Sync ref with state so the RAF loop always reads fresh data 
   useEffect(() => {
     engineDataRef.current = engineData;
   }, [engineData]);
+  // Detects total virtual desktop size across all monitors
+  const screenBoundsRef = useRef({ width: window.screen.width, height: window.screen.height, offsetX: 0, offsetY: 0 });
+
+// monitor detection and logging
+useEffect(() => {
+  availableMonitors().then((monitors) => {
+    if (monitors.length === 0) return;
+
+    let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+
+    for (const m of monitors) {
+      const sf = m.scaleFactor;
+      const lx = m.position.x / sf;   // logical X of this monitor's top-left
+      const ly = m.position.y / sf;
+      const lw = m.size.width  / sf;  // logical width
+      const lh = m.size.height / sf;
+
+      left   = Math.min(left,   lx);
+      top    = Math.min(top,    ly);
+      right  = Math.max(right,  lx + lw);
+      bottom = Math.max(bottom, ly + lh);
+    }
+
+    screenBoundsRef.current = {
+      width:   right - left,   // Total virtual desktop width
+      height:  bottom - top,
+      offsetX: left,           // Will be NEGATIVE when laptop is left of external primary
+      offsetY: top,
+    };
+
+    console.log("[Screens]", screenBoundsRef.current);
+  }).catch(console.error);
+}, []);
+
 
   //Webcam + Tauri IPC listener 
   useEffect(() => {
+    let mediaStream: MediaStream | null = null;
+
     // Webcam
     navigator.mediaDevices
       .getUserMedia({ video: true })
       .then((stream) => {
+        mediaStream = stream;
         if (videoRef.current) videoRef.current.srcObject = stream;
       })
       .catch((err) => console.error("Webcam error:", err));
@@ -56,31 +95,74 @@ function App() {
         setEngineData(parsed);
         setIsConnected(true);
     
-        // ── OS Mouse Control ─────────────────────────────────────
-        if (parsed.x !== undefined && parsed.y !== undefined && parsed.event !== "pause") {
-          const ALPHA = 0.25; // Smoothing: lower = smoother but laggy, higher = snappier but jittery
-    
-          // Exponential moving average — blends current position toward new position
-          smoothXRef.current = smoothXRef.current * (1 - ALPHA) + (1 - parsed.x) * ALPHA;
-          smoothYRef.current = smoothYRef.current * (1 - ALPHA) + parsed.y * ALPHA;
-    
-          // Convert 0-1 range to actual screen pixel coordinates
-          const screenX = Math.round(smoothXRef.current * window.screen.width);
-          const screenY = Math.round(smoothYRef.current * window.screen.height);
-    
-          // Call the Rust command — moves the real OS cursor
-          await invoke("move_mouse", { x: screenX, y: screenY });
+       // OS Mouse Control 
+      if (parsed.x !== undefined && parsed.y !== undefined && parsed.event !== "pause") {
+        const ALPHA = 0.25;
+
+        // Dead-zone remap: MediaPipe's practical range → full 0-1
+        // Tune these constants if cursor still can't reach edges
+        // mirroredX = (1 - X), so:
+        const CAM_X_MIN = 1 - 0.9008;    // Left edge
+        const CAM_X_MAX = 0.80;          // Right edge (lowered to make reaching the right screen easier)
+
+        const CAM_Y_MIN = 0.10, CAM_Y_MAX = 0.90;
+        const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+        const mirroredX = 1 - parsed.x;
+        const normX = clamp((mirroredX - CAM_X_MIN) / (CAM_X_MAX - CAM_X_MIN), 0, 1);
+        const normY = clamp((parsed.y  - CAM_Y_MIN) / (CAM_Y_MAX - CAM_Y_MIN), 0, 1);
+
+        smoothXRef.current = smoothXRef.current * (1 - ALPHA) + normX * ALPHA;
+        smoothYRef.current = smoothYRef.current * (1 - ALPHA) + normY * ALPHA;
+
+        const { width, height, offsetX, offsetY } = screenBoundsRef.current;
+        const screenX = Math.round(offsetX + smoothXRef.current * width);
+        const screenY = Math.round(offsetY + smoothYRef.current * height);
+
+
+        await invoke("move_mouse", { x: screenX, y: screenY });
+      }
+
+      //Gesture Actions 
+      const DEBOUNCE_MS = 800; // min ms between the same gesture firing again
+      const now = Date.now();
+      const last = lastGestureRef.current;
+
+      if (parsed.event === "left-click" || parsed.event === "scroll") {
+        // Fire only if gesture just changed, OR enough time has passed
+        if (parsed.event !== last.event || now - last.time > DEBOUNCE_MS) {
+          lastGestureRef.current = { event: parsed.event, time: now };
+
+          if (parsed.event === "left-click") {
+            await invoke("mouse_click", { button: "left" });
+          } else if (parsed.event === "scroll") {
+            await invoke("mouse_scroll", { length: -3 }); // negative = scroll up
+          }
         }
-        // ─────────────────────────────────────────────────────────
+      } else {
+        // Gesture changed to something neutral — reset so next gesture fires cleanly
+        if (parsed.event !== last.event) {
+          lastGestureRef.current = { event: parsed.event ?? "", time: 0 };
+        }
+      }
+
     
       } catch (err) {
         console.error("Failed to parse engine JSON:", err);
       }
     });
+
+    
     
 
-    return () => { unlisten.then((fn) => fn()); };
+    return () => {
+      if (mediaStream) {
+        (mediaStream as MediaStream).getTracks().forEach((track) => track.stop());
+      }
+      unlisten.then((fn) => fn());
+    };
   }, []);
+  
 
   //Canvas overlay: laser-dot draw loop
   useEffect(() => {
