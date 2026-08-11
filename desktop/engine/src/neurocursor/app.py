@@ -32,6 +32,48 @@ def run() -> int:
     HandLandmarkerOptions = mp.tasks.vision.HandLandmarkerOptions
     VisionRunningMode = mp.tasks.vision.RunningMode
 
+    # --- MJPEG SERVER ---
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from socketserver import ThreadingMixIn
+
+    global_frame = None
+
+    class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+        pass
+
+    class CamHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path.endswith('.mjpg'):
+                self.send_response(200)
+                self.send_header('Content-type', 'multipart/x-mixed-replace; boundary=--jpgboundary')
+                self.end_headers()
+                while True:
+                    try:
+                        if global_frame is not None:
+                            ret, jpeg = cv2.imencode('.jpg', global_frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+                            self.wfile.write(b'--jpgboundary\r\n')
+                            self.send_header('Content-type', 'image/jpeg')
+                            self.send_header('Content-length', str(len(jpeg.tobytes())))
+                            self.end_headers()
+                            self.wfile.write(jpeg.tobytes())
+                            self.wfile.write(b'\r\n')
+                        time.sleep(0.033)
+                    except Exception:
+                        break
+            else:
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'OK')
+
+        def log_message(self, format, *args):
+            pass 
+
+    mjpeg_port = 49152
+    server = ThreadingHTTPServer(('127.0.0.1', mjpeg_port), CamHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    # --------------------
+
     # ── Pause/Resume toggle state ─────────────────────────────────────────
     # Open palm once = pause.  Open palm again = resume.  No fist needed.
     cursor_paused = False  # Is the cursor currently frozen?
@@ -117,6 +159,9 @@ def run() -> int:
                 success, frame = cap.read()
                 if not success:
                     continue
+
+                global global_frame
+                global_frame = frame
 
                 rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)

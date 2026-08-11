@@ -125,15 +125,8 @@ function App() {
   useEffect(() => {
     if (!engineStarted) return;
 
-    let mediaStream: MediaStream | null = null;
-
-    navigator.mediaDevices
-      .getUserMedia({ video: true })
-      .then((stream) => {
-        mediaStream = stream;
-        if (videoRef.current) videoRef.current.srcObject = stream;
-      })
-      .catch((err) => console.error("Webcam error:", err));
+    // Webcam is now captured by the Python engine directly to prevent cross-process locking deadlocks.
+    // The engine streams frames over a local MJPEG server on port 49152.
 
     const unlisten = listen<string>("engine-event", async (event) => {
       try {
@@ -192,9 +185,6 @@ function App() {
     });
 
     return () => {
-      if (mediaStream) {
-        (mediaStream as MediaStream).getTracks().forEach((track) => track.stop());
-      }
       unlisten.then((fn) => fn());
     };
   }, [engineStarted]); // Only fires when engine is started
@@ -383,15 +373,15 @@ function App() {
               </div>
             )}
 
-            {/* Video Feed — subtle warm tone */}
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover transform -scale-x-100"
-              style={{ filter: 'sepia(0.12) contrast(1.03) brightness(0.95) hue-rotate(-8deg)' }}
-            />
+            {/* Engine MJPEG Feed — subtle warm tone */}
+            {engineStarted && (
+              <img
+                src="http://127.0.0.1:49152/cam.mjpg"
+                alt="Camera feed"
+                className="w-full h-full object-cover transform -scale-x-100"
+                style={{ filter: 'sepia(0.12) contrast(1.03) brightness(0.95) hue-rotate(-8deg)' }}
+              />
+            )}
 
             {/* Warm corner vignettes */}
             <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 0% 50%, rgba(120,50,10,0.18) 0%, transparent 55%), radial-gradient(ellipse at 100% 50%, rgba(120,50,10,0.18) 0%, transparent 55%), radial-gradient(ellipse at 50% 100%, rgba(5,3,2,0.45) 0%, transparent 60%)' }} />
