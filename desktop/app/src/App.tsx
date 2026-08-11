@@ -15,6 +15,7 @@ interface EngineMessage {
   timestamp?: number;
   status?: string;
   message?: string;
+  frame?: string;
 }
 
 // Gesture → colour mapping
@@ -71,8 +72,8 @@ function App() {
 
   // ── App state ───────────────────────────────────────────────────────────
   const [engineData, setEngineData] = useState<EngineMessage | null>(null);
-  const [mjpegUrl, setMjpegUrl] = useState("http://127.0.0.1:49152/cam.mjpg");
   const [isConnected, setIsConnected] = useState(false);
+  const [videoFrame, setVideoFrame] = useState<string | null>(null);
 
   // Settings — loaded from localStorage
   const [alpha, setAlpha]           = useState(() => parseFloat(localStorage.getItem('nc_alpha')       ?? '0.25'));
@@ -125,25 +126,15 @@ function App() {
   useEffect(() => {
     if (!engineStarted) return;
 
-    // Trigger macOS camera permission prompt BEFORE starting the Python engine
-    // Once permission is granted, we immediately release the lock and start the engine.
-    navigator.mediaDevices.getUserMedia({ video: true })
-      .then((stream) => {
-        stream.getTracks().forEach(track => track.stop());
-        // macOS camera hardware takes up to 1s to fully release the lock
-        setTimeout(() => {
-          invoke("start_engine").catch(console.error);
-        }, 1000);
-      })
-      .catch((err) => {
-        console.error("Camera permission denied or camera not found:", err);
-      });
-
     const unlisten = listen<string>("engine-event", async (event) => {
       try {
         const parsed: EngineMessage = JSON.parse(event.payload);
         setEngineData(parsed);
         setIsConnected(true);
+        
+        if (parsed.frame) {
+          setVideoFrame(`data:image/jpeg;base64,${parsed.frame}`);
+        }
 
         // OS Mouse Control
         if (parsed.x !== undefined && parsed.y !== undefined && parsed.event !== "pause") {
@@ -191,18 +182,12 @@ function App() {
           lastScrollYRef.current = null;
         }
       } catch (err) {
-        console.error("Failed to parse engine telemetry:", err, event.payload);
+        console.error("Failed to parse engine JSON:", err);
       }
     });
 
-    const unlistenError = listen<string>("engine-error", async (event) => {
-      console.error("PYTHON ENGINE ERROR:", event.payload);
-    });
-
-    // Cleanup: stop tracks and unlisten when engine stops
     return () => {
       unlisten.then((fn) => fn());
-      unlistenError.then((fn) => fn());
     };
   }, [engineStarted]); // Only fires when engine is started
 
@@ -390,17 +375,11 @@ function App() {
               </div>
             )}
 
-            {/* Engine MJPEG Feed — subtle warm tone */}
-            {engineStarted && (
+            {/* Video Feed — subtle warm tone */}
+            {videoFrame && (
               <img
-                src={mjpegUrl}
-                alt="Camera feed"
-                onError={() => {
-                  // If it fails to connect because Python is still booting, retry in 500ms
-                  setTimeout(() => {
-                    setMjpegUrl(`http://127.0.0.1:49152/cam.mjpg?t=${Date.now()}`);
-                  }, 500);
-                }}
+                src={videoFrame}
+                alt="Webcam feed"
                 className="w-full h-full object-cover transform -scale-x-100"
                 style={{ filter: 'sepia(0.12) contrast(1.03) brightness(0.95) hue-rotate(-8deg)' }}
               />
