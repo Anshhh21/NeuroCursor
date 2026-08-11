@@ -48,7 +48,7 @@ jobs:
         working-directory: desktop/engine
 
       - name: Build Engine
-        run: pyinstaller neurocursor-engine.spec --clean
+        run: python -m PyInstaller neurocursor-engine.spec --clean
         working-directory: desktop/engine
 
       - name: Move Engine Binary
