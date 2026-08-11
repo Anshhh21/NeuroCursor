@@ -1,5 +1,6 @@
 import { motion } from 'motion/react';
 import { ArrowDownTrayIcon, CodeBracketIcon } from '@heroicons/react/24/outline';
+import SwarmCursor from './SwarmCursor';
 
 const AppLogo = () => (
   <div className="relative w-10 h-10 flex items-center justify-center">
@@ -15,10 +16,22 @@ const AppLogo = () => (
 
 function App() {
   return (
-    <div className="min-h-screen bg-[#050403] text-stone-200 selection:bg-amber-500/20 font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-[#050403] text-stone-200 selection:bg-amber-500/20 font-sans overflow-x-hidden relative">
       
       {/* Background ambient lighting */}
       <div className="fixed inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% -20%, rgba(180,100,30,0.12) 0%, transparent 60%), radial-gradient(circle at 50% 120%, rgba(50,20,5,0.4) 0%, transparent 50%)' }} />
+
+      <SwarmCursor 
+        color="#eb833b" 
+        accentColor="#ffffff"
+        count={8} 
+        size={5} 
+        speed={2.5} 
+        spread={100} 
+        wander={0.25} 
+        trail={0.75} 
+        scatterOnClick 
+      />
 
       <nav className="relative z-10 w-full max-w-6xl mx-auto px-6 py-8 flex items-center justify-between">
         <div className="flex items-center gap-3">

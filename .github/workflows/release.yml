@@ -12,10 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-13
-            target: x86_64-apple-darwin
-            engine_name: neurocursor-engine-x86_64-apple-darwin
-            bin_ext: ""
+
           - os: macos-14
             target: aarch64-apple-darwin
             engine_name: neurocursor-engine-aarch64-apple-darwin
