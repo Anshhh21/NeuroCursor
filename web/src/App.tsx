@@ -74,7 +74,7 @@ function App() {
             >
               <div className="absolute inset-0 rounded-full bg-white blur-md opacity-20 group-hover:opacity-40 transition-opacity" />
               <ArrowDownTrayIcon className="w-5 h-5" />
-              <span>Download for macOS</span>
+              <span>Download for macOS (.dmg)</span>
             </a>
 
             {/* Windows Download */}
@@ -83,7 +83,7 @@ function App() {
               className="group flex items-center justify-center gap-3 px-8 py-4 rounded-full bg-stone-900/50 border border-stone-800 text-stone-300 font-bold text-sm sm:text-base hover:bg-stone-800 hover:text-white transition-all"
             >
               <ArrowDownTrayIcon className="w-5 h-5" />
-              <span>Download for Windows</span>
+              <span>Download for Windows (.exe)</span>
             </a>
           </div>
           
