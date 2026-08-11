@@ -1,4 +1,4 @@
-# 🧠 NeuroCursor
+# NeuroCursor
 
 A dead-simple way to control your computer with your bare hands. Instead of dropping $3k on an Apple Vision Pro or dealing with a crusty mouse, you literally just point at the screen and it moves. It’s giving telekinesis. 
 
