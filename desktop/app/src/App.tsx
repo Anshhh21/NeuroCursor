@@ -124,8 +124,16 @@ function App() {
   useEffect(() => {
     if (!engineStarted) return;
 
-    // Webcam is now captured by the Python engine directly to prevent cross-process locking deadlocks.
-    // The engine streams frames over a local MJPEG server on port 49152.
+    // Trigger macOS camera permission prompt BEFORE starting the Python engine
+    // Once permission is granted, we immediately release the lock and start the engine.
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then((stream) => {
+        stream.getTracks().forEach(track => track.stop());
+        invoke("start_engine").catch(console.error);
+      })
+      .catch((err) => {
+        console.error("Camera permission denied or camera not found:", err);
+      });
 
     const unlisten = listen<string>("engine-event", async (event) => {
       try {
