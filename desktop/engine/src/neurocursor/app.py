@@ -120,9 +120,17 @@ def run() -> int:
     try:
         with HandLandmarker.create_from_options(options) as landmarker:
             last_ts_ms = -1  # Tracks last timestamp — MediaPipe requires strictly increasing values
-            while cap.isOpened():
+            while True:
+                if not cap.isOpened():
+                    cap.open(0)
+                    if not cap.isOpened():
+                        time.sleep(0.5)
+                        continue
+
                 success, frame = cap.read()
                 if not success:
+                    cap.release()  # Force reopen next loop to recover from temporary lock
+                    time.sleep(0.5)
                     continue
 
                 rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)

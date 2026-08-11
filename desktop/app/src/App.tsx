@@ -126,6 +126,14 @@ function App() {
   useEffect(() => {
     if (!engineStarted) return;
 
+    // Trigger macOS camera permission prompt, then immediately release the hardware lock
+    // so the Python engine can take exclusive control.
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        stream.getTracks().forEach(track => track.stop());
+      })
+      .catch(err => console.error("Webcam permission error:", err));
+
     const unlisten = listen<string>("engine-event", async (event) => {
       try {
         const parsed: EngineMessage = JSON.parse(event.payload);
