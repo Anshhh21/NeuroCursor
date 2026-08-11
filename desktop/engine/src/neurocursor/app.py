@@ -12,6 +12,9 @@ from neurocursor import __version__
 def get_distance(p1, p2):
     return math.hypot(p1.x - p2.x, p1.y - p2.y)
 
+# Global frame for MJPEG server
+global_frame = None
+
 def run() -> int:
     status = {
         "engineStatus": "ready",
@@ -36,8 +39,6 @@ def run() -> int:
     import threading
     from http.server import BaseHTTPRequestHandler, HTTPServer
     from socketserver import ThreadingMixIn
-
-    global_frame = None
 
     class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
         pass
@@ -70,8 +71,13 @@ def run() -> int:
             pass 
 
     mjpeg_port = 49152
-    server = ThreadingHTTPServer(('127.0.0.1', mjpeg_port), CamHandler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
+    ThreadingHTTPServer.allow_reuse_address = True
+    try:
+        server = ThreadingHTTPServer(('127.0.0.1', mjpeg_port), CamHandler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    except Exception as e:
+        print(json.dumps({"engineStatus": "ready", "message": f"MJPEG port taken, preview disabled. Error: {e}"}))
+        sys.stdout.flush()
     # --------------------
 
     # ── Pause/Resume toggle state ─────────────────────────────────────────
