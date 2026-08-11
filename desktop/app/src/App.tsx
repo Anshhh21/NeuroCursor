@@ -84,7 +84,6 @@ function App() {
   const scrollSpeedRef = useRef(parseInt(localStorage.getItem('nc_scrollSpeed') ?? '50'));
   const lastScrollYRef = useRef<number | null>(null);
 
-  const videoRef       = useRef<HTMLVideoElement>(null);
   const canvasRef      = useRef<HTMLCanvasElement>(null);
   const engineDataRef  = useRef<EngineMessage | null>(null);
   const smoothXRef     = useRef(0.5);
