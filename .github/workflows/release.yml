@@ -74,8 +74,8 @@ jobs:
         with:
           projectPath: desktop/app
           args: --target ${{ matrix.target }}
-          tagName: v1.0.7
-          releaseName: 'NeuroCursor v1.0.7'
+          tagName: v1.1.0
+          releaseName: 'NeuroCursor v1.1.0'
           releaseBody: 'Download the latest version of NeuroCursor for your platform below.'
           releaseDraft: false
           prerelease: false
