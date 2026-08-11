@@ -62,6 +62,17 @@ async fn start_engine(app: tauri::AppHandle) -> Result<(), String> {
                     }
                 }
             }
+            if let Some(stderr) = child.stderr.take() {
+                let reader = BufReader::new(stderr);
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        let trimmed = line.trim().to_string();
+                        if !trimmed.is_empty() {
+                            let _ = app.emit("engine-error", trimmed);
+                        }
+                    }
+                }
+            }
         });
     }
 
@@ -77,13 +88,24 @@ async fn start_engine(app: tauri::AppHandle) -> Result<(), String> {
             let (mut rx, child) = sidecar_command.spawn().expect("Failed to spawn sidecar");
             let _child_process = child;
             while let Some(event) = rx.recv().await {
-                if let CommandEvent::Stdout(line) = event {
-                    if let Ok(line_str) = String::from_utf8(line) {
-                        let trimmed = line_str.trim();
-                        if !trimmed.is_empty() {
-                            let _ = app.emit("engine-event", trimmed);
+                match event {
+                    CommandEvent::Stdout(line) => {
+                        if let Ok(line_str) = String::from_utf8(line) {
+                            let trimmed = line_str.trim();
+                            if !trimmed.is_empty() {
+                                let _ = app.emit("engine-event", trimmed);
+                            }
                         }
                     }
+                    CommandEvent::Stderr(line) => {
+                        if let Ok(line_str) = String::from_utf8(line) {
+                            let trimmed = line_str.trim();
+                            if !trimmed.is_empty() {
+                                let _ = app.emit("engine-error", trimmed);
+                            }
+                        }
+                    }
+                    _ => {}
                 }
             }
         });

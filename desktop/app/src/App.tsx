@@ -71,6 +71,7 @@ function App() {
 
   // ── App state ───────────────────────────────────────────────────────────
   const [engineData, setEngineData] = useState<EngineMessage | null>(null);
+  const [mjpegUrl, setMjpegUrl] = useState("http://127.0.0.1:49152/cam.mjpg");
   const [isConnected, setIsConnected] = useState(false);
 
   // Settings — loaded from localStorage
@@ -129,7 +130,10 @@ function App() {
     navigator.mediaDevices.getUserMedia({ video: true })
       .then((stream) => {
         stream.getTracks().forEach(track => track.stop());
-        invoke("start_engine").catch(console.error);
+        // macOS camera hardware takes up to 1s to fully release the lock
+        setTimeout(() => {
+          invoke("start_engine").catch(console.error);
+        }, 1000);
       })
       .catch((err) => {
         console.error("Camera permission denied or camera not found:", err);
@@ -187,12 +191,18 @@ function App() {
           lastScrollYRef.current = null;
         }
       } catch (err) {
-        console.error("Failed to parse engine JSON:", err);
+        console.error("Failed to parse engine telemetry:", err, event.payload);
       }
     });
 
+    const unlistenError = listen<string>("engine-error", async (event) => {
+      console.error("PYTHON ENGINE ERROR:", event.payload);
+    });
+
+    // Cleanup: stop tracks and unlisten when engine stops
     return () => {
       unlisten.then((fn) => fn());
+      unlistenError.then((fn) => fn());
     };
   }, [engineStarted]); // Only fires when engine is started
 
@@ -383,8 +393,14 @@ function App() {
             {/* Engine MJPEG Feed — subtle warm tone */}
             {engineStarted && (
               <img
-                src="http://127.0.0.1:49152/cam.mjpg"
+                src={mjpegUrl}
                 alt="Camera feed"
+                onError={() => {
+                  // If it fails to connect because Python is still booting, retry in 500ms
+                  setTimeout(() => {
+                    setMjpegUrl(`http://127.0.0.1:49152/cam.mjpg?t=${Date.now()}`);
+                  }, 500);
+                }}
                 className="w-full h-full object-cover transform -scale-x-100"
                 style={{ filter: 'sepia(0.12) contrast(1.03) brightness(0.95) hue-rotate(-8deg)' }}
               />

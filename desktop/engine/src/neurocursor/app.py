@@ -158,13 +158,27 @@ def run() -> int:
 
     cap = cv2.VideoCapture(0)
     
+    if not cap.isOpened():
+        print(json.dumps({"engineStatus": "error", "message": "Failed to open camera. The camera might be in use or permissions are missing."}))
+        sys.stdout.flush()
+        return 1
+
     try:
         with HandLandmarker.create_from_options(options) as landmarker:
             last_ts_ms = -1  # Tracks last timestamp — MediaPipe requires strictly increasing values
+            fail_count = 0
             while cap.isOpened():
                 success, frame = cap.read()
                 if not success:
+                    fail_count += 1
+                    if fail_count > 60:
+                        print(json.dumps({"engineStatus": "error", "message": "Lost camera connection."}))
+                        sys.stdout.flush()
+                        break
+                    time.sleep(0.05)
                     continue
+                
+                fail_count = 0
 
                 global global_frame
                 global_frame = frame
