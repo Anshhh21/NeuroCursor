@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "app",
+  "productName": "NeuroCursor",
   "version": "0.1.0",
   "identifier": "com.neurocursor.dev",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "app",
+        "title": "NeuroCursor",
         "width": 800,
         "height": 600
       }
