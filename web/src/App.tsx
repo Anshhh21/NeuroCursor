@@ -103,6 +103,21 @@ function App() {
             </div>
           </div>
 
+          <div className="mt-4 max-w-2xl text-left bg-white/5 border border-white/10 p-5 rounded-2xl text-stone-300 text-xs sm:text-sm leading-relaxed backdrop-blur-md">
+            <div className="flex gap-3">
+              <span className="text-xl">🛡️</span>
+              <div>
+                <p className="font-semibold text-stone-100 mb-1">Windows Users</p>
+                <p className="text-stone-400 mb-1">
+                  Windows SmartScreen may show a warning that this file <strong>"isn't commonly downloaded"</strong> or <strong>"Windows protected your PC"</strong>. This happens because this is a brand new, independently built app without an expensive corporate publisher certificate.
+                </p>
+                <p className="text-stone-400">
+                  To install it safely: Hover over the download warning, click the <strong>three dots (...)</strong> or <strong>See more</strong>, and select <strong>Keep anyway</strong>. If a blue popup appears when opening the file, click <strong>More info</strong> and then <strong>Run anyway</strong>.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <p className="text-xs text-stone-500 mt-8 font-mono">
             Requires webcam. Processing runs 100% locally.
           </p>
