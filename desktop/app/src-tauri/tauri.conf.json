@@ -35,9 +35,7 @@
       "bin/neurocursor-engine"
     ],
     "macOS": {
-      "infoPlist": {
-        "NSCameraUsageDescription": "NeuroCursor requires camera access to track your hand gestures for mouse control."
-      }
+      "infoPlist": "Info.plist"
     }
   }
 }
